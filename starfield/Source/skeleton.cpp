@@ -91,7 +91,7 @@ void Update()
   float dt = float(t2-t);
   t = t2;
   /* Update variables*/
-  int v = 1;
+  int v = 0.3;
   for (int s=0; s<stars.size(); s++)
   {
     // Add code for update of stars
@@ -99,10 +99,10 @@ void Update()
     stars[s].y = stars[s].y;
     stars[s].z = stars[s].z - (v * dt);
 
-    // if (stars[s].z <= 0)
-    //   stars[s].z += 1;
-    // if (stars[s].z > 1)
-    //   stars[s].z -= 1;
+    if (stars[s].z <= 0)
+      stars[s].z += 1;
+    if (stars[s].z > 1)
+      stars[s].z -= 1;
   }
 }
 
