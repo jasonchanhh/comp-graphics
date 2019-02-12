@@ -25,16 +25,21 @@ struct Intersection
   int triangleIndex;
 };
 
+vector<Triangle> triangles;
+
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
 
 bool Update();
 void Draw(screen* screen);
+bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles, Intersection& closestIntersection);
+
 
 int main( int argc, char* argv[] )
 {
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
+  LoadTestModel(triangles);
 
   while ( Update())
     {
@@ -52,15 +57,20 @@ int main( int argc, char* argv[] )
 void Draw(screen* screen)
 {
   /* Clear buffer */
-  memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
+  memset(screen->buffer, 0, SCREEN_WIDTH*SCREEN_HEIGHT*sizeof(uint32_t));
 
-  vec3 colour(1.0,0.0,0.0);
-  for(int i=0; i<1000; i++)
-    {
-      uint32_t x = rand() % screen->width;
-      uint32_t y = rand() % screen->height;
-      PutPixelSDL(screen, x, y, colour);
+  for (int y = 0; y < SCREEN_HEIGHT; ++y) {
+    for (int x = 0; x < SCREEN_WIDTH; ++x) {
+      float focalLength = 1.0;
+      vec4 d = vec4(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
+      vec4 cameraPos(0.0,0.0,0.0,1.0);
+      Intersection closest;
+      if (ClosestIntersection(cameraPos, d, triangles, closest) == true) {
+        vec3 color = triangles[closest.triangleIndex].color;
+        PutPixelSDL(screen, x, y, color);
+      }
     }
+  }
 }
 
 /*Place updates of parameters here*/
@@ -117,16 +127,21 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     vec4 v2 = triangle.v2;
     vec3 e1 = vec3(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z);
     vec3 e2 = vec3(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z);
-    vec3 b = vec3(s.x-v0.x,s.y-v0.y,s.z-v0.z);
-    mat3 A( -d, e1, e2 );
+    vec3 b = vec3(start.x-v0.x,start.y-v0.y,start.z-v0.z);
+    vec3 d = vec3(-1 * dir.x, -1 * dir.y, -1 * dir.z);
+    mat3 A( d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
     // x = (t,u,v)
     if ((x.x >= 0) && (x.y > 0) && (x.z > 0) && (x.y + x.z < 1)) {
       if (closestIntersection.distance > x.x) {
         closestIntersection.distance = x.x;
-        closestIntersection.position = v0 + (x.y * e1) + (x.z * e2);
+        // vec4 E1 = vec4(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z,1);
+        // vec4 E2 = vec4(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z,1);
+        closestIntersection.position = v0 + vec4(x.y * e1, 1.0) + vec4(x.z * e2, 1.0);
         closestIntersection.triangleIndex = i;
       }
     }
   }
+  if (closestIntersection.distance < m) return true;
+  else return false;
 }
