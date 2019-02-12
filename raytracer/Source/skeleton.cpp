@@ -107,21 +107,26 @@ bool Update()
 }
 
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles, Intersection& closestIntersection) {
-  vec3 min_x;
+  float m = std::numeric_limits<float>::max();
+  closestIntersection.distance = m;
   for (int i = 0; i < triangles.size(); ++i) {
     // find intersection between ray and triangle
     Triangle triangle = triangles[i];
     vec4 v0 = triangle.v0;
     vec4 v1 = triangle.v1;
     vec4 v2 = triangle.v2;
-    vec3 e1 = vec3(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z)
-    vec3 e2 = vec3(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z)
+    vec3 e1 = vec3(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z);
+    vec3 e2 = vec3(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z);
     vec3 b = vec3(s.x-v0.x,s.y-v0.y,s.z-v0.z);
     mat3 A( -d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
     // x = (t,u,v)
     if ((x.x >= 0) && (x.y > 0) && (x.z > 0) && (x.y + x.z < 1)) {
-        min_x.x = min(min_x.x, x.x);
+      if (closestIntersection.distance > x.x) {
+        closestIntersection.distance = x.x;
+        closestIntersection.position = v0 + (x.y * e1) + (x.z * e2);
+        closestIntersection.triangleIndex = i;
+      }
     }
   }
 }
