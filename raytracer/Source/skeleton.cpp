@@ -61,11 +61,11 @@ void Draw(screen* screen)
 
   for (int y = 0; y < SCREEN_HEIGHT; ++y) {
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
-      float focalLength = 1.0;
+      float focalLength = SCREEN_HEIGHT/2;
       vec4 d = vec4(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
-      vec4 cameraPos(0.0,0.0,0.0,1.0);
+      vec4 cameraPos(0.0,0.0,-2.0,1.0);
       Intersection closest;
-      if (ClosestIntersection(cameraPos, d, triangles, closest) == true) {
+      if (ClosestIntersection(cameraPos, d, triangles, closest)) {
         vec3 color = triangles[closest.triangleIndex].color;
         PutPixelSDL(screen, x, y, color);
       }
@@ -132,7 +132,7 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     mat3 A( d, e1, e2 );
     vec3 x = glm::inverse( A ) * b;
     // x = (t,u,v)
-    if ((x.x >= 0) && (x.y > 0) && (x.z > 0) && (x.y + x.z < 1)) {
+    if ((x.x >= 0.0) && (x.y > 0.0) && (x.z > 0.0) && (x.y + x.z <= 1.01)) {
       if (closestIntersection.distance > x.x) {
         closestIntersection.distance = x.x;
         // vec4 E1 = vec4(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z,1);
