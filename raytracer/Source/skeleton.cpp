@@ -14,8 +14,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 256
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 32
+#define SCREEN_HEIGHT 32
 #define FULLSCREEN_MODE false
 
 struct Intersection
@@ -26,6 +26,9 @@ struct Intersection
 };
 
 vector<Triangle> triangles;
+vec4 cameraPos;
+float yaw = 0;
+mat4 R;
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -42,6 +45,7 @@ int main( int argc, char* argv[] )
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
   LoadTestModel(triangles);
+  cameraPos = vec4(0.0,0.0,-2.0,1.0);
 
   while ( Update())
     {
@@ -64,13 +68,13 @@ void Draw(screen* screen)
   for (int y = 0; y < SCREEN_HEIGHT; ++y) {
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
       float focalLength = SCREEN_HEIGHT/2;
-      vec3 d = vec3(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength);
-      normalise(d);
-      vec4 d_normalized = vec4(d, 1.0);
+      vec4 d = vec4(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
+      vec4 d_rotated = R * d;
+      // normalise(d);
+      // vec4 d_normalized = vec4(d, 1.0);
       // std::cout << " (" << d_normalized.x << "," << d_normalized.y << "," << d_normalized.z << "," << d_normalized.w << ") ";
-      vec4 cameraPos(0.0,0.0,-2.0,1.0);
       Intersection closest;
-      if (ClosestIntersection(cameraPos, d_normalized, triangles, closest) == true) {
+      if (ClosestIntersection(cameraPos, d_rotated, triangles, closest) == true) {
         vec3 color = triangles[closest.triangleIndex].color;
         PutPixelSDL(screen, x, y, color);
       }
@@ -87,6 +91,7 @@ bool Update()
   float dt = float(t2-t);
   t = t2;
 
+
   SDL_Event e;
   while(SDL_PollEvent(&e))
     {
@@ -102,16 +107,24 @@ bool Update()
 	      {
 	      case SDLK_UP:
 		/* Move camera forward */
+        cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z + 0.1, 1.0);
 		break;
 	      case SDLK_DOWN:
 		/* Move camera backwards */
+        cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z - 0.1, 1.0);
 		break;
 	      case SDLK_LEFT:
 		/* Move camera left */
-		break;
+      // cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
+      yaw += 0.1;
+      R = mat4(vec4(cos(yaw),0,sin(yaw),0.0), vec4(0,1,0,0), vec4(-sin(yaw),0,cos(yaw),0), vec4(0,0,0,1));
+    break;
 	      case SDLK_RIGHT:
 		/* Move camera right */
-		break;
+      // cameraPos = vec4(cameraPos.x + 0.1, cameraPos.y, cameraPos.z, 1.0);
+      yaw -= 0.1;
+      R = mat4(vec4(cos(yaw),0,sin(yaw),0.0), vec4(0,1,0,0), vec4(-sin(yaw),0,cos(yaw),0), vec4(0,0,0,1));
+    break;
 	      case SDLK_ESCAPE:
 		/* Move camera quit */
 		return false;
