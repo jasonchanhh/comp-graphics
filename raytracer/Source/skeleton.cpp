@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <limits>
 
+
 using namespace std;
 using glm::vec3;
 using glm::mat3;
@@ -17,6 +18,7 @@ SDL_Event event;
 #define SCREEN_WIDTH 32
 #define SCREEN_HEIGHT 32
 #define FULLSCREEN_MODE false
+#define PI 3.14159265358979323846
 
 struct Intersection
 {
@@ -36,8 +38,8 @@ mat4 R;
 bool Update();
 void Draw(screen* screen);
 bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles, Intersection& closestIntersection);
+vec3 DirectLight( const Intersection& i);
 void normalise(vec3& new_vec);
-
 
 
 int main( int argc, char* argv[] )
@@ -75,7 +77,7 @@ void Draw(screen* screen)
       // std::cout << " (" << d_normalized.x << "," << d_normalized.y << "," << d_normalized.z << "," << d_normalized.w << ") ";
       Intersection closest;
       if (ClosestIntersection(cameraPos, d_rotated, triangles, closest) == true) {
-        vec3 color = triangles[closest.triangleIndex].color;
+        vec3 color = DirectLight(closest);
         PutPixelSDL(screen, x, y, color);
       }
     }
@@ -180,6 +182,19 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
   if (closestIntersection.distance <= min) return true;
   else return false;
 }
+
+vec3 DirectLight( const Intersection& i) {
+    vec4 lightPos(0, -0.5, -0.7, 1.0);
+    vec3 lightColor = vec3(1,1,1) * 14.0f;
+
+    vec3 normal = vec3(triangles[i.triangleIndex].normal);
+    vec3 r = vec3(lightPos - i.position);
+    float distance = glm::length(r);
+    float projection = glm::dot(normal, glm::normalize(r));
+    if (projection < 0) projection = 0;
+    vec3 D = lightColor * float(projection / (4*PI*distance*distance));
+}
+
 
 void normalise(vec3& new_vec) {
   new_vec = new_vec / sqrt(new_vec.x * new_vec.x + new_vec.y * new_vec.y + new_vec.z * new_vec.z);
