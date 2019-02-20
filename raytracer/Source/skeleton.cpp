@@ -15,8 +15,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 32
-#define SCREEN_HEIGHT 32
+#define SCREEN_WIDTH 64
+#define SCREEN_HEIGHT 64
 #define FULLSCREEN_MODE false
 #define PI 3.14159265358979323846
 
@@ -27,10 +27,12 @@ struct Intersection
   int triangleIndex;
 };
 
-vector<Triangle> triangles;
+vector<Triangle> allTriangles;
 vec4 cameraPos;
 float yaw = 0;
 mat4 R;
+vec4 lightPos(0, -0.5, -0.7, 1.0);
+
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -46,7 +48,7 @@ int main( int argc, char* argv[] )
 {
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
-  LoadTestModel(triangles);
+  LoadTestModel(allTriangles);
   cameraPos = vec4(0.0,0.0,-2.0,1.0);
 
   while ( Update())
@@ -76,10 +78,13 @@ void Draw(screen* screen)
       // vec4 d_normalized = vec4(d, 1.0);
       // std::cout << " (" << d_normalized.x << "," << d_normalized.y << "," << d_normalized.z << "," << d_normalized.w << ") ";
       Intersection closest;
-      if (ClosestIntersection(cameraPos, d_rotated, triangles, closest) == true) {
-        vec3 color = DirectLight(closest);
-        PutPixelSDL(screen, x, y, color);
+      if (ClosestIntersection(cameraPos, d_rotated, allTriangles, closest) == true) {
+        vec3 direct = DirectLight(closest);
+        vec3 color = allTriangles[closest.triangleIndex].color;
+        vec3 reflected = color * direct;
+        PutPixelSDL(screen, x, y, reflected);
       }
+      else PutPixelSDL(screen, x, y, vec3(0,0,0));
     }
   }
 }
@@ -124,8 +129,26 @@ bool Update()
 	      case SDLK_RIGHT:
 		/* Move camera right */
       // cameraPos = vec4(cameraPos.x + 0.1, cameraPos.y, cameraPos.z, 1.0);
-      yaw -= 0.1;
-      R = mat4(vec4(cos(yaw),0,sin(yaw),0.0), vec4(0,1,0,0), vec4(-sin(yaw),0,cos(yaw),0), vec4(0,0,0,1));
+        yaw -= 0.1;
+        R = mat4(vec4(cos(yaw),0,sin(yaw),0.0), vec4(0,1,0,0), vec4(-sin(yaw),0,cos(yaw),0), vec4(0,0,0,1));
+    break;
+        case SDLK_w:
+        lightPos.z += 0.1;
+    break;
+        case SDLK_s:
+        lightPos.z -= 0.1;
+    break;
+        case SDLK_a:
+        lightPos.x -= 0.1;
+    break;
+        case SDLK_d:
+        lightPos.x += 0.1;
+    break;
+        case SDLK_q:
+        lightPos.y -= 0.1;
+    break;
+        case SDLK_e:
+        lightPos.y += 0.1;
     break;
 	      case SDLK_ESCAPE:
 		/* Move camera quit */
@@ -184,15 +207,26 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
 }
 
 vec3 DirectLight( const Intersection& i) {
-    vec4 lightPos(0, -0.5, -0.7, 1.0);
     vec3 lightColor = vec3(1,1,1) * 14.0f;
-
-    vec3 normal = vec3(triangles[i.triangleIndex].normal);
+    vec3 D;
+    vec3 normal = vec3(allTriangles[i.triangleIndex].normal);
     vec3 r = vec3(lightPos - i.position);
+
     float distance = glm::length(r);
     float projection = glm::dot(normal, glm::normalize(r));
     if (projection < 0) projection = 0;
-    vec3 D = lightColor * float(projection / (4*PI*distance*distance));
+
+    vec4 r_normal = vec4(glm::normalize(r), 1.0);
+
+    Intersection closestShadow;
+    vec3 hitBias = vec3(i.position) + normal * float(0.01);
+    if ((ClosestIntersection(vec4(hitBias,1.0), r_normal, allTriangles, closestShadow) == true)) {
+      if (closestShadow.distance < distance) {
+        lightColor = vec3(0,0,0);
+      }
+    }
+    D = lightColor * float(projection / (4*PI*distance*distance));
+    return D;
 }
 
 
