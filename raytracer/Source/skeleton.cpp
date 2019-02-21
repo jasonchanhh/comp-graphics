@@ -15,8 +15,8 @@ using glm::mat4;
 
 SDL_Event event;
 
-#define SCREEN_WIDTH 256
-#define SCREEN_HEIGHT 256
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 128
 #define FULLSCREEN_MODE false
 #define PI 3.14159265358979323846
 
@@ -48,7 +48,7 @@ int main( int argc, char* argv[] )
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
   LoadTestModel(allTriangles);
-  cameraPos = vec4(0.0,0.0,-2.0,1.0);
+  cameraPos = vec4(0.0,0.0,-3.0,1.0);
 
   while ( Update())
     {
@@ -70,7 +70,7 @@ void Draw(screen* screen)
 
   for (int y = 0; y < SCREEN_HEIGHT; ++y) {
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
-      float focalLength = SCREEN_HEIGHT/2;
+      float focalLength = SCREEN_HEIGHT;
       vec4 d = vec4(x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, focalLength, 1.0);
       vec4 d_normalize = glm::normalize(d);
       vec4 d_rotated = R * d_normalize;
@@ -79,10 +79,12 @@ void Draw(screen* screen)
       if (ClosestIntersection(cameraPos, d_rotated, allTriangles, closest)) {
         vec3 direct = DirectLight(closest);
         vec3 color = allTriangles[closest.triangleIndex].color;
-        vec3 reflected = color * direct;
+        vec3 reflected = color * (direct); //+ 0.5f * vec3(1, 1, 1));
         PutPixelSDL(screen, x, y, reflected);
       }
-      else PutPixelSDL(screen, x, y, vec3(0,0,0));
+      else {
+        PutPixelSDL(screen, x, y, vec3(0,0,0));
+      }
     }
   }
 }
@@ -167,41 +169,42 @@ bool ClosestIntersection(vec4 start, vec4 dir, const vector<Triangle>& triangles
     vec4 v2 = triangle.v2;
     vec3 e1 = vec3(v1.x-v0.x,v1.y-v0.y,v1.z-v0.z);
     vec3 e2 = vec3(v2.x-v0.x,v2.y-v0.y,v2.z-v0.z);
-    vec3 d = vec3(dir.x,dir.y,dir.z);
+    vec3 d = vec3(dir.x, dir.y, dir.z);
     vec3 b = vec3(start.x-v0.x,start.y-v0.y,start.z-v0.z);
-    // mat3 A( d, e1, e2 );
-    // vec3 x = glm::inverse( A ) * b;
-    vec3 p = glm::cross(d, e2);
-    float det = glm::dot(p, e1);
-    // if the determinant is negative then the triangle is facing backwards
-    // if (det <= 0.0) continue;
+    // mat3 A( vec3(-dir), e1, e2 );
+    // if (glm::determinant(A) != 0) {
+      // vec3 x = glm::inverse( A ) * b;
+      vec3 p = glm::cross(d, e2);
+      float det = glm::dot(p, e1);
+      // if the determinant is negative then the triangle is facing backwards
+      // if (det <= 0.0) continue;
 
-    // float u = x.y;
-    // float v = x.z;
-    // float t = x.x;
+      // float u = x.y;
+      // float v = x.z;
+      // float t = x.x;
 
-    float u = (glm::dot(p, b)) / det;
-    if (u >= 0.0) {
-      vec3 q = glm::cross(b, e1);
-      float v = (glm::dot(q, d)) / det;
-      if (v >= 0.0 && (u + v <= 1.0)) {
-        float t = (glm::dot(q, e2)) / det;
-        if (t >= 0.0) {
-    // if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0) && (t >= 0.0)) {
-        // cout << "(" << t << "," << u << "," << v << "), ";
-          if (min > t) {
-            min = t;
-            closestIntersection.distance = t;
-            closestIntersection.position = vec4(vec3(v0) + (u * e1) + (v * e2), 1.0);
-            closestIntersection.triangleIndex = i;
+      float u = (glm::dot(p, b)) / det;
+      if (u >= 0.0) {
+        vec3 q = glm::cross(b, e1);
+        float v = (glm::dot(q, d)) / det;
+        if (v >= 0.0 && (u + v <= 1.0)) {
+          float t = (glm::dot(q, e2)) / det;
+          if (t >= 0.0f) {
+      // if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0) && (t >= 0.0)) {
+          // cout << "(" << t << "," << u << "," << v << "), ";
+            if (min > t) {
+              min = t;
+              closestIntersection.distance = t;
+              closestIntersection.position = start + t*dir;
+              closestIntersection.triangleIndex = i;
+            }
+        // }
           }
-      // }
         }
       }
     }
-  }
-  if (closestIntersection.distance <= min) return true;
-  else return false;
+  // }
+  return min != std::numeric_limits<float>::max();
 }
 
 vec3 DirectLight( const Intersection& i) {
@@ -213,17 +216,23 @@ vec3 DirectLight( const Intersection& i) {
     float projection = glm::dot(normal, glm::normalize(r));
     if (projection < 0.0) projection = 0.0;
 
-    vec4 r_normal = vec4(glm::normalize(r), 1.0);
+    // vec4 r_normal = vec4(glm::normalize(r), 1.0);
 
     // check if the pixel is in shadow
     Intersection closestShadow;
-    vec3 hitBias = vec3(i.position) + normal * float(0.01);
-    if (ClosestIntersection(vec4(hitBias,1.0), r_normal, allTriangles, closestShadow)) {
-      if (closestShadow.distance < lightDistance) {
-        lightColor = vec3(0,0,0);
+    vec4 dir = lightPos - i.position;
+    vec4 dir_n = glm::normalize(dir);
+    vec4 hitBias = i.position + dir_n * 1e-3f;
+
+    // float biasDistance = glm::length(dir);
+
+    if (ClosestIntersection(hitBias, dir, allTriangles, closestShadow)) {
+      if (closestShadow.distance < 1) {
+          // cout << "(" << closestShadow.distance << "," << biasDistance << "), ";
+          projection = 0.0;
       }
     }
 
-    vec3 D = lightColor * float(projection / (4*PI*lightDistance*lightDistance));
+    vec3 D = lightColor * float(projection / (4.0*PI*lightDistance*lightDistance));
     return D;
 }
