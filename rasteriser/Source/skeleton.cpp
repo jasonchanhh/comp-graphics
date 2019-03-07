@@ -4,6 +4,7 @@
 #include "SDLauxiliary.h"
 #include "TestModelH.h"
 #include <stdint.h>
+#include <glm/gtx/string_cast.hpp>
 
 using namespace std;
 using glm::vec3;
@@ -21,6 +22,8 @@ SDL_Event event;
 
 vector<Triangle> triangles;
 vec4 cameraPos( 0, 0, -3.001,1 );
+mat4 R;
+float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -30,13 +33,17 @@ void Draw(screen* screen);
 void VertexShader( const vec4& v, ivec2& p );
 void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color );
 void DrawPolygonEdges( screen* screen, const vector<vec4>& vertices );
+void ComputePolygonRows(const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels );
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result );
+void TransformationMatrix(mat4& M);
 
 int main( int argc, char* argv[] )
 {
 
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
   LoadTestModel(triangles);
+  // Initialise R
+  R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
 
   while ( Update())
     {
@@ -85,7 +92,14 @@ void Draw(screen* screen)
 
 void VertexShader( const vec4& v, ivec2& p ) {
   float focalLength = SCREEN_HEIGHT;
+  mat4 M;
+  TransformationMatrix(M);
+  // cout << "["<< glm::to_string(v) << std::endl;
+  // cout << glm::to_string(M) << std::endl;
+  // vec4 vmap = M * v;
+  // vec4 vprime = vmap / vmap.w;
   vec4 vprime = v - cameraPos;
+  // cout << glm::to_string(vprime) << "]" << std::endl;
   int xprime = floor(focalLength * vprime.x / vprime.z + (SCREEN_WIDTH/2));
   int yprime = floor(focalLength * vprime.y / vprime.z + (SCREEN_HEIGHT/2));
   p.x = xprime;
@@ -119,6 +133,23 @@ void DrawPolygonEdges( screen* screen, const vector<vec4>& vertices ) {
   }
 }
 
+void ComputePolygonRows(const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels, vector<ivec2>& rightPixels ) {
+  // 1. Find max and min y-value of the polygon
+  // and compute the number of rows it occupies.
+
+  // 2. Resize leftPixels and rightPixels
+  // so that they have an element for each row.
+
+  // 3. Initialize the x-coordinates in leftPixels
+  // to some really large value and the x-coordinates
+  // in rightPixels to some really small value.
+
+  // 4. Loop through all edges of the polygon and use
+  // linear interpolation to find the x-coordinate for
+  // each row it occupies. Update the corresponding
+  // values in rightPixels and leftPixels.
+}
+
 /*Place updates of parameters here*/
 bool Update()
 {
@@ -142,20 +173,27 @@ bool Update()
 	    switch(key_code)
 	      {
 	      case SDLK_UP:
-		/* Move camera forward */
-		break;
+		      /* Move camera forward */
+          cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z + 0.1, 1.0);
+		      break;
 	      case SDLK_DOWN:
-		/* Move camera backwards */
-		break;
+		      /* Move camera backwards */
+          cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z - 0.1, 1.0);
+		      break;
 	      case SDLK_LEFT:
-		/* Move camera left */
-		break;
+		      /* Move camera left */
+          // cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
+          yaw += 0.1;
+          R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
+		      break;
 	      case SDLK_RIGHT:
-		/* Move camera right */
-		break;
+      		/* Move camera right */
+          yaw -= 0.1;
+          R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
+      		break;
 	      case SDLK_ESCAPE:
-		/* Move camera quit */
-		return false;
+      		/* Move camera quit */
+      		return false;
 	      }
 	  }
     }
@@ -170,4 +208,10 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ) {
     result[i] = round(current);
     current += step;
   }
+}
+
+void TransformationMatrix(mat4& M) {
+  mat4 tr(vec4(1.0,0.0,0.0,cameraPos.x), vec4(0.0,1.0,0.0,cameraPos.y), vec4(0.0,0.0,1.0,cameraPos.z), vec4(0.0,0.0,0.0,1.0));
+  mat4 negtr(vec4(1.0,0.0,0.0,-1*cameraPos.x), vec4(0.0,1.0,0.0,-1*cameraPos.y), vec4(0.0,0.0,1.0,-1*cameraPos.z), vec4(0.0,0.0,0.0,1.0));
+  M = tr * R;
 }
