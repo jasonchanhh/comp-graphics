@@ -65,12 +65,10 @@ void getEdges( ivec2 a, ivec2 b, vector<ivec2>& line);
 
 int main( int argc, char* argv[] )
 {
-
   screen *screen = InitializeSDL( SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE );
   LoadTestModel(triangles);
   // Initialise R
   R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
-  TransformationMatrix(M);
 
   while ( Update())
     {
@@ -89,13 +87,6 @@ void Draw(screen* screen)
 {
   /* Clear buffer */
   memset(screen->buffer, 0, screen->height*screen->width*sizeof(uint32_t));
-
-/*
-  vec3 testcolor(1,0,0);
-  ivec2 a(0,0);
-  ivec2 b(SCREEN_WIDTH/2, SCREEN_HEIGHT/2);
-  DrawLineSDL(screen, a, b, testcolor);
-*/
 
   for( int y=0; y<SCREEN_HEIGHT; ++y )
     for( int x=0; x<SCREEN_WIDTH; ++x )
@@ -129,16 +120,19 @@ void Draw(screen* screen)
 
 void VertexShader( const Vertex& v, Pixel& p ) {
   float focalLength = SCREEN_HEIGHT;
-  // cout << "["<< glm::to_string(v) << std::endl;
-  // cout << glm::to_string(M) << std::endl;
-  // vec4 vmap = M * v.position;
+  TransformationMatrix(M);
+  cout << glm::to_string(M) << std::endl;
+  vec4 vmap = M * v.position;
+  cout << "["<< glm::to_string(v.position) << "] "<< std::endl;
+  cout << "["<< glm::to_string(vmap) << "] "<< std::endl;
   // vec4 vprime = vmap / vmap.w;
   vec4 vprime = v.position - cameraPos;
+  cout << "["<< glm::to_string(vprime) << "] "<< std::endl;
   // cout << glm::to_string(vprime) << "]" << std::endl;
   p.x = floor(focalLength * vprime.x / vprime.z + (SCREEN_WIDTH/2));
   p.y = floor(focalLength * vprime.y / vprime.z + (SCREEN_HEIGHT/2));
   p.zinv = 1/vprime.z;
-  p.pos3d = v.position;
+  p.pos3d = v.position * p.zinv;
 }
 
 void PixelShader( screen* screen, const Pixel& p, vec3 currentColor ) {
@@ -148,7 +142,7 @@ void PixelShader( screen* screen, const Pixel& p, vec3 currentColor ) {
     depthBuffer[y][x] = p.zinv;
 
     // compute illumination
-    vec3 lightPower = 1.1f*vec3( 1.0, 1.0, 1.0 );
+    vec3 lightPower = 14.0f*vec3( 1.0, 1.0, 1.0 );
     vec3 indirectLightPowerPerArea = 0.5f*vec3( 1, 1, 1 );
     vec4 position = p.pos3d / p.zinv;
     vec4 r = lightPos - position;
@@ -169,35 +163,6 @@ void getEdges( Pixel a, Pixel b, vector<Pixel>& line) {
   int pixels = max(deltaX, deltaY) + 1;
   line.resize(pixels);
   InterpolateDepth(a, b, line);
-}
-
-void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color ) {
-  /*
-  vector<ivec2> line;
-  getEdges(a, b, line);
-  for (int i = 0; i < line.size(); ++i) {
-    PutPixelSDL(screen, line[i].x, line[i].y, color);
-  }
-  */
-}
-
-void DrawPolygonEdges( screen* screen, const vector<vec4>& vertices ) {
-  /*
-  int V = vertices.size();
-
-  // Transform each vertex from 3D world position to 2D image position:
-  vector<ivec2> projectedVertices( V );
-  for( int i=0; i<V; ++i ) {
-    VertexShader( vertices[i], projectedVertices[i] );
-  }
-
-  // Loop over all vertices and draw the edge from it to the next vertex:
-  for( int i=0; i<V; ++i ) {
-    int j = (i+1)%V; // The next vertex
-    vec3 color( 1, 1, 1 );
-    DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
-  }
-  */
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels, vector<Pixel>& rightPixels ) {
@@ -285,6 +250,25 @@ void DrawPolygon(screen* screen, const vector<Vertex>& vertices, vec3 currentCol
     DrawRows(screen, leftPixels, rightPixels, currentColor);
 }
 
+void InterpolateDepth( Pixel a, Pixel b, vector<Pixel>& result ) {
+  int N = result.size();
+  vec2 step = vec2(b.x-a.x, b.y-a.y) / float(max(N-1,1));
+  vec2 current = vec2(a.x, a.y);
+  float stepzinv = (b.zinv - a.zinv) / float(max(N-1,1));
+  float currentzinv = a.zinv;
+  vec4 steppos = (b.pos3d - a.pos3d) / float(max(N-1,1));
+  vec4 currentpos = a.pos3d;
+  for( int i=0; i<N; ++i ) {
+    result[i].x = round(current.x);
+    result[i].y = round(current.y);
+    current += step;
+    result[i].zinv = currentzinv;
+    currentzinv += stepzinv;
+    result[i].pos3d = currentpos;
+    currentpos += steppos;
+  }
+}
+
 /*Place updates of parameters here*/
 bool Update()
 {
@@ -316,15 +300,13 @@ bool Update()
           cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z - 0.1, 1.0);
 		      break;
 	      case SDLK_LEFT:
-		      /* Move camera left */
+		      /* Rotate camera left */
           // cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
           yaw += 0.1;
-          R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
 		      break;
 	      case SDLK_RIGHT:
-      		/* Move camera right */
+      		/* Rotate camera right */
           yaw -= 0.1;
-          R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
       		break;
         case SDLK_w:
           lightPos.z += 0.1;
@@ -353,6 +335,13 @@ bool Update()
   return true;
 }
 
+void TransformationMatrix(mat4& M) {
+  R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
+  mat4 tr(vec4(1.0,0.0,0.0,cameraPos.x), vec4(0.0,1.0,0.0,cameraPos.y), vec4(0.0,0.0,1.0,cameraPos.z), vec4(0.0,0.0,0.0,1.0));
+  mat4 negtr(vec4(1.0,0.0,0.0,-1*cameraPos.x), vec4(0.0,1.0,0.0,-1*cameraPos.y), vec4(0.0,0.0,1.0,-1*cameraPos.z), vec4(0.0,0.0,0.0,1.0));
+  M = negtr * R;
+}
+
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ) {
   int N = result.size();
   vec2 step = vec2(b-a) / float(max(N-1,1));
@@ -363,27 +352,31 @@ void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ) {
   }
 }
 
-void InterpolateDepth( Pixel a, Pixel b, vector<Pixel>& result ) {
-  int N = result.size();
-  vec2 step = vec2(b.x-a.x, b.y-a.y) / float(max(N-1,1));
-  vec2 current = vec2(a.x, a.y);
-  float stepzinv = (b.zinv - a.zinv) / float(max(N-1,1));
-  float currentzinv = a.zinv;
-  vec4 steppos = ((b.pos3d * b.zinv) - (a.pos3d * a.zinv)) / float(max(N-1,1));
-  vec4 currentpos = a.pos3d * a.zinv;
-  for( int i=0; i<N; ++i ) {
-    result[i].x = round(current.x);
-    result[i].y = round(current.y);
-    current += step;
-    result[i].zinv = currentzinv;
-    currentzinv += stepzinv;
-    result[i].pos3d = currentpos;
-    currentpos += steppos;
+void DrawLineSDL( screen* screen, ivec2 a, ivec2 b, vec3 color ) {
+  /*
+  vector<ivec2> line;
+  getEdges(a, b, line);
+  for (int i = 0; i < line.size(); ++i) {
+    PutPixelSDL(screen, line[i].x, line[i].y, color);
   }
+  */
 }
 
-void TransformationMatrix(mat4& M) {
-  mat4 tr(vec4(1.0,0.0,0.0,cameraPos.x), vec4(0.0,1.0,0.0,cameraPos.y), vec4(0.0,0.0,1.0,cameraPos.z), vec4(0.0,0.0,0.0,1.0));
-  mat4 negtr(vec4(1.0,0.0,0.0,-1*cameraPos.x), vec4(0.0,1.0,0.0,-1*cameraPos.y), vec4(0.0,0.0,1.0,-1*cameraPos.z), vec4(0.0,0.0,0.0,1.0));
-  M = tr * R;
+void DrawPolygonEdges( screen* screen, const vector<vec4>& vertices ) {
+  /*
+  int V = vertices.size();
+
+  // Transform each vertex from 3D world position to 2D image position:
+  vector<ivec2> projectedVertices( V );
+  for( int i=0; i<V; ++i ) {
+    VertexShader( vertices[i], projectedVertices[i] );
+  }
+
+  // Loop over all vertices and draw the edge from it to the next vertex:
+  for( int i=0; i<V; ++i ) {
+    int j = (i+1)%V; // The next vertex
+    vec3 color( 1, 1, 1 );
+    DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
+  }
+  */
 }
