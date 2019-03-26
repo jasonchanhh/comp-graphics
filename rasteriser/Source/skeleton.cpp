@@ -36,8 +36,10 @@ struct Vertex {
 vector<Triangle> triangles;
 vec4 cameraPos( 0, 0, -3.001,1 );
 mat4 R;
+mat4 T;
 mat4 M;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
+float pitch = 0; // Pitch angle controlling camera rotation around x-axis
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 vec4 currentNormal;
 vec3 currentReflectance;
@@ -290,39 +292,54 @@ bool Update()
 	    int key_code = e.key.keysym.sym;
 	    switch(key_code)
 	      {
-	      case SDLK_UP:
+	      case SDLK_w:
 		      /* Move camera forward */
           cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z + 0.1, 1.0);
 		      break;
-	      case SDLK_DOWN:
+	      case SDLK_s:
 		      /* Move camera backwards */
           cameraPos = vec4(cameraPos.x, cameraPos.y, cameraPos.z - 0.1, 1.0);
 		      break;
+        case SDLK_a:
+		      /* Move camera left */
+          cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
+		      break;
+        case SDLK_d:
+		      /* Move camera right */
+          cameraPos = vec4(cameraPos.x + 0.1, cameraPos.y, cameraPos.z, 1.0);
+		      break;
+        case SDLK_UP:
+		      /* Rotate camera up */
+          pitch -= 0.05;
+		      break;
+        case SDLK_DOWN:
+		      /* Rotate camera down */
+          pitch += 0.05;
+		      break;
 	      case SDLK_LEFT:
 		      /* Rotate camera left */
-          // cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
           yaw += 0.05;
 		      break;
 	      case SDLK_RIGHT:
       		/* Rotate camera right */
           yaw -= 0.05;
       		break;
-        case SDLK_w:
+        case SDLK_i:
           lightPos.z += 0.1;
           break;
-        case SDLK_s:
+        case SDLK_k:
           lightPos.z -= 0.1;
           break;
-        case SDLK_a:
+        case SDLK_j:
           lightPos.x -= 0.1;
           break;
-        case SDLK_d:
+        case SDLK_l:
           lightPos.x += 0.1;
           break;
-        case SDLK_q:
+        case SDLK_u:
           lightPos.y -= 0.1;
           break;
-        case SDLK_e:
+        case SDLK_o:
           lightPos.y += 0.1;
           break;
 	      case SDLK_ESCAPE:
@@ -336,9 +353,14 @@ bool Update()
 
 void TransformationMatrix(mat4& M) {
   R = mat4(vec4(cos(yaw),0.0,sin(yaw),0.0), vec4(0.0,1.0,0.0,0.0), vec4(-sin(yaw),0.0,cos(yaw),0.0), vec4(0.0,0.0,0.0,1.0));
+  T = mat4(vec4(cos(yaw)*cos(0),-cos(pitch)*sin(0)+sin(pitch)*sin(yaw)*cos(0),sin(pitch)*sin(0)+cos(pitch)*sin(yaw)*cos(0),0.0),
+      vec4(cos(yaw)*sin(0),cos(pitch)*cos(0)+sin(pitch)*sin(yaw)*sin(0),-sin(pitch)*cos(0)+cos(pitch)*sin(yaw)*sin(0),0.0),
+      vec4(-sin(yaw),sin(pitch)*cos(yaw),cos(pitch)*cos(yaw),0.0),
+      vec4(0.0,0.0,0.0,1.0));
+
   mat4 tr(vec4(1.0,0.0,0.0,cameraPos.x), vec4(0.0,1.0,0.0,cameraPos.y), vec4(0.0,0.0,1.0,cameraPos.z), vec4(0.0,0.0,0.0,1.0));
   mat4 negtr(vec4(1.0,0.0,0.0,-1*cameraPos.x), vec4(0.0,1.0,0.0,-1*cameraPos.y), vec4(0.0,0.0,1.0,-1*cameraPos.z), vec4(0.0,0.0,0.0,1.0));
-  M = negtr * R;
+  M = negtr * T;
 }
 
 void Interpolate( ivec2 a, ivec2 b, vector<ivec2>& result ) {
