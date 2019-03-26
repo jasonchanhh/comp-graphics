@@ -79,7 +79,7 @@ void Draw(screen* screen)
       if (ClosestIntersection(cameraPos, d_rotated, allTriangles, closest)) {
         vec3 direct = DirectLight(closest);
         vec3 color = allTriangles[closest.triangleIndex].color;
-        vec3 reflected = color * (direct); //+ 0.5f * vec3(1, 1, 1));
+        vec3 reflected = color * ((direct) + 0.5f * vec3(1, 1, 1));
         PutPixelSDL(screen, x, y, reflected);
       }
       else {

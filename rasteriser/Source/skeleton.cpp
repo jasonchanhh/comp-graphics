@@ -121,14 +121,13 @@ void Draw(screen* screen)
 void VertexShader( const Vertex& v, Pixel& p ) {
   float focalLength = SCREEN_HEIGHT;
   TransformationMatrix(M);
-  cout << glm::to_string(M) << std::endl;
-  vec4 vmap = M * v.position;
-  cout << "["<< glm::to_string(v.position) << "] "<< std::endl;
-  cout << "["<< glm::to_string(vmap) << "] "<< std::endl;
+  // cout << glm::to_string(M) << std::endl;
+  vec4 vprime = v.position * M;
+  // cout << "["<< glm::to_string(v.position) << "] "<< std::endl;
+  // cout << "["<< glm::to_string(vmap) << "] "<< std::endl;
   // vec4 vprime = vmap / vmap.w;
-  vec4 vprime = v.position - cameraPos;
-  cout << "["<< glm::to_string(vprime) << "] "<< std::endl;
-  // cout << glm::to_string(vprime) << "]" << std::endl;
+  // vec4 vprime = v.position - cameraPos;
+  // cout << "["<< glm::to_string(vprime) << "] "<< std::endl;
   p.x = floor(focalLength * vprime.x / vprime.z + (SCREEN_WIDTH/2));
   p.y = floor(focalLength * vprime.y / vprime.z + (SCREEN_HEIGHT/2));
   p.zinv = 1/vprime.z;
@@ -302,11 +301,11 @@ bool Update()
 	      case SDLK_LEFT:
 		      /* Rotate camera left */
           // cameraPos = vec4(cameraPos.x - 0.1, cameraPos.y, cameraPos.z, 1.0);
-          yaw += 0.1;
+          yaw += 0.05;
 		      break;
 	      case SDLK_RIGHT:
       		/* Rotate camera right */
-          yaw -= 0.1;
+          yaw -= 0.05;
       		break;
         case SDLK_w:
           lightPos.z += 0.1;
